@@ -1,8 +1,8 @@
 import logging
 from homeassistant.components.sensor import SensorEntity
 from homeassistant.const import UnitOfTemperature, PERCENTAGE
+from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.device_registry import DeviceEntryType, DeviceInfo
-from homeassistant.helpers.entity import EntityCategory
 from .const import DOMAIN
 from .comfort import calculate_thermal_comfort
 
@@ -19,19 +19,38 @@ async def async_setup_entry(hass, entry, async_add_entities):
     tr = config.get("tr")  # Optional
     va = config.get("va")  # Optional
     prefix = config.get("name", "Comfort")
+    device_id = config.get("device")
+
+    # Build device_info: link to existing device if selected, otherwise create virtual device
+    device_info = None
+    if device_id:
+        dev_reg = dr.async_get(hass)
+        device = dev_reg.async_get(device_id)
+        if device:
+            device_info = DeviceInfo(
+                identifiers=device.identifiers,
+            )
+    if device_info is None:
+        device_info = DeviceInfo(
+            identifiers={(DOMAIN, entry.entry_id)},
+            name=prefix,
+            manufacturer="Indoor Thermal Comfort",
+            model="Comfort Tool",
+            entry_type=DeviceEntryType.SERVICE,
+        )
 
     entities = []
     for metric in ["pmv", "ppd", "set", "ce", "ts"]:
         entities.append(ComfortSensor(
             hass, entry.entry_id,
             ta, tr, va, rh, clo, met,
-            metric, prefix
+            metric, prefix, device_info
         ))
 
     async_add_entities(entities, True)
 
 class ComfortSensor(SensorEntity):
-    def __init__(self, hass, entry_id, ta, tr, va, rh, clo, met, metric, prefix):
+    def __init__(self, hass, entry_id, ta, tr, va, rh, clo, met, metric, prefix, device_info):
         self._hass = hass
         self._metric = metric
         self._ta = ta
@@ -43,15 +62,8 @@ class ComfortSensor(SensorEntity):
 
         self._attr_name = f"{prefix} {metric.upper()}"
         self._attr_unique_id = f"{DOMAIN}_{entry_id}_{metric}"
-        self._attr_entity_category = EntityCategory.DIAGNOSTIC
         self._attr_native_value = None
-        self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, entry_id)},
-            name=prefix,
-            manufacturer="Indoor Thermal Comfort",
-            model="Comfort Tool",
-            entry_type=DeviceEntryType.SERVICE,
-        )
+        self._attr_device_info = device_info
 
         icon_map = {
             "pmv": "mdi:scale-balance",

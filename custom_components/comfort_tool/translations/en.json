@@ -6,6 +6,7 @@
         "description": "Select existing sensors and input parameters.",
         "data": {
           "name": "Integration name",
+          "device": "Device (optional, link sensors to an existing device)",
           "ta": "Average air temperature (Ta)",
           "tr": "Mean radiant temperature (MRT)",
           "va": "Air velocity (Va)",
